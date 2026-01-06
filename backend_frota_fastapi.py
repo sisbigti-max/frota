@@ -2,6 +2,16 @@
 # Backend FastAPI para integrar ZUQ (/vehicles + /realtime)
 # e expor /api/frota para o frontend
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # em produção pode restringir
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 import os
 import requests
 from fastapi import FastAPI
