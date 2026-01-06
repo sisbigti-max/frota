@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import requests
-import os
-from dotenv import load_dotenv
+import os, requests, traceback
 from time import time
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -27,6 +26,51 @@ HEADERS = {
 CACHE_TTL = 30
 _cache = {"ts": 0, "data": []}
 
+# =========================
+# FALLBACK TEMPORÁRIO
+# =========================
+FALLBACK_DATA = [
+    {
+        "unidade": "ITAITINGA",
+        "placa": "JUX7E77",
+        "status": "ROTA",
+        "motorista": "SAMUEL SILVA DE LIMA",
+        "localizacao": "RUA R - ITAITINGA",
+        "rota": "19",
+        "rom": "8528",
+        "prev_retorno": None
+    },
+    {
+        "unidade": "PICOS",
+        "placa": "HYU3B28",
+        "status": "ROTA",
+        "motorista": "—",
+        "localizacao": "BR-230 - PICOS",
+        "rota": None,
+        "rom": None,
+        "prev_retorno": None
+    },
+    {
+        "unidade": "IMPERATRIZ",
+        "placa": "SBC9D25",
+        "status": "ROTA",
+        "motorista": "WELISSON SILVA FEITOSA",
+        "localizacao": "BR-010 - IMPERATRIZ",
+        "rota": "43",
+        "rom": "7182",
+        "prev_retorno": "2026-01-06"
+    },
+    {
+        "unidade": "BELÉM",
+        "placa": "SBD5B25",
+        "status": "PATIO",
+        "motorista": "FAGNER AUGUSTO OLIVEIRA",
+        "localizacao": "BR-316 - CASTANHAL",
+        "rota": "38",
+        "rom": "1183",
+        "prev_retorno": None
+    }
+]
 
 def fetch_vehicles():
     r = requests.get(
@@ -37,7 +81,6 @@ def fetch_vehicles():
     r.raise_for_status()
     return r.json().get("data", [])
 
-
 def fetch_realtime():
     r = requests.get(
         f"{ZUQ_BASE}/realtime/vehicles",
@@ -47,48 +90,48 @@ def fetch_realtime():
     r.raise_for_status()
     return r.json().get("data", [])
 
-
 @app.get("/api/frota")
 def frota():
     global _cache
     now = time()
 
     if now - _cache["ts"] < CACHE_TTL:
-        return _cache["data"]  # 👈 array direto
+        return _cache["data"]
 
-    vehicles = fetch_vehicles()
-    realtime = fetch_realtime()
+    try:
+        vehicles = fetch_vehicles()
+        realtime = fetch_realtime()
 
-    rt_map = {str(v.get("vehicle_id")): v for v in realtime}
+        rt_map = {v.get("vehicle_id"): v for v in realtime}
+        result = []
 
-    resultado = []
-
-    for v in vehicles:
-        rt = rt_map.get(str(v.get("id")), {})
-
-        if rt.get("ignition") is True:
-            status = "ROTA"
-        elif rt.get("ignition") is False:
-            status = "PATIO"
-        else:
+        for v in vehicles:
+            rt = rt_map.get(v.get("id"), {})
             status = "AG_INFO"
+            if rt.get("ignition") is True:
+                status = "ROTA"
+            elif rt.get("ignition") is False:
+                status = "PATIO"
 
-        resultado.append({
-            "unidade": v.get("group_name") or "---",
-            "placa": v.get("plate") or "---",
-            "status": status,
-            "zuq_entrada": v.get("entry_time") or "---",
-            "zuq_saida": v.get("exit_time") or "---",
-            "manut_tipo": "---",
-            "gfs_entrada": "---",
-            "gfs_saida": "---",
-            "supersoft": v.get("status") or "---",
-            "motorista": v.get("driver_name") or "---",
-            "localizacao": rt.get("address") or "---",
-            "rota": v.get("route_code") or "---",
-            "rom": v.get("last_rom") or "---",
-            "prev_retorno": v.get("expected_return") or "---"
-        })
+            result.append({
+                "unidade": v.get("group_name"),
+                "placa": v.get("plate"),
+                "status": status,
+                "motorista": v.get("driver_name"),
+                "localizacao": rt.get("address"),
+                "rota": v.get("route_code"),
+                "rom": v.get("last_rom"),
+                "prev_retorno": v.get("expected_return"),
+            })
 
-    _cache = {"ts": now, "data": resultado}
-    return resultado  # 👈 ARRAY PURO
+        _cache = {"ts": now, "data": result}
+        return result
+
+    except Exception as e:
+        print("⚠️ FALLBACK ATIVADO")
+        traceback.print_exc()
+
+        return {
+            "fallback": True,
+            "data": FALLBACK_DATA
+        }
