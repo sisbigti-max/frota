@@ -1,12 +1,12 @@
-# backend_frota_fastapi.py
-# Backend FastAPI para integrar ZUQ (/vehicles + /realtime)
-# e expor /api/frota para o frontend
-
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import traceback
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # em produção pode restringir
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
